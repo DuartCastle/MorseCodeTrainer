@@ -39,8 +39,8 @@ except pygame.error as e:
 # === Morse Settings ===
 current_frequency = 700
 sample_rate = 44100
-dot_duration = 0.1
-current_wpm = 7
+current_wpm = 10
+dot_duration = 60.0 / (current_wpm * 50.0)
 show_morse = True
 voice_enabled = False
 
@@ -105,6 +105,32 @@ def print_yellow(text):
 def print_blue(text):
     print(f"\033[34m{text}\033[0m")
 
+# === Play Letter ===
+def play_letter(engine, letter):
+    if letter == ' ':
+        print("Space (between words)")
+        pygame.time.delay(int(dot_duration * 7 * 1000))
+        return
+
+    if show_morse:
+        print_yellow(f"Sending: {letter} ({morse_code[letter]})")
+    else:
+        print_yellow(f"Sending: {letter}")
+
+    # Play the morse code for the letter
+    for symbol in morse_code[letter]:
+        play_morse_sound(symbol, current_frequency)
+        pygame.time.delay(int(dot_duration * 1000))
+
+    # Speak the letter
+    if voice_enabled and engine:
+        # Wait so the user can write their guess.
+        pygame.time.delay(int(dot_duration * 6 * 1000))
+        speak_text(engine, letter)
+
+    # Space between letters
+    pygame.time.delay(int(dot_duration * 3 * 1000))
+
 # === Practice Functions ===
 def practice_week_letters_continuously(week_num):
     letters = week_letters[week_num]
@@ -116,58 +142,29 @@ def practice_week_letters_continuously(week_num):
         letter = random.choice(letters)
         if letter == ' ':
             continue
-        if show_morse:
-            print_yellow(f"Sending: {letter} ({morse_code[letter]})")
-        else:
-            print_yellow(f"Sending: {letter}")
-        for symbol in morse_code[letter]:
-            play_morse_sound(symbol, current_frequency)
-            pygame.time.delay(int(dot_duration * 1000))
-        pygame.time.delay(int(dot_duration * 3 * 1000))
-        if voice_enabled:
-            time.sleep(0.2)
-            speak_text(engine, letter)
+
+        play_letter(engine, letter)
+
 
 def practice_all_characters_continuously():
     try:
         engine = pyttsx3.init()
     except Exception:
         engine = None
+
     while True:
         letter = random.choice(list(morse_code.keys()))
-        if show_morse:
-            print_yellow(f"Sending: {letter} ({morse_code[letter]})")
-        else:
-            print_yellow(f"Sending: {letter}")
-        for symbol in morse_code[letter]:
-            play_morse_sound(symbol, current_frequency)
-            pygame.time.delay(int(dot_duration * 1000))
-        pygame.time.delay(int(dot_duration * 3 * 1000))
-        if voice_enabled:
-            time.sleep(0.2)
-            speak_text(engine, letter)
+        play_letter(engine, letter)
 
 def play_user_text_in_morse(user_text):
     try:
         engine = pyttsx3.init()
     except Exception:
         engine = None
+
     for char in user_text.upper():
-        if char == ' ':
-            print("Space (between words)")
-            pygame.time.delay(int(dot_duration * 7 * 1000))
-        elif char in morse_code:
-            if show_morse:
-                print_yellow(f"Sending: {char} ({morse_code[char]})")
-            else:
-                print_yellow(f"Sending: {char}")
-            for symbol in morse_code[char]:
-                play_morse_sound(symbol, current_frequency)
-                pygame.time.delay(int(dot_duration * 1000))
-            pygame.time.delay(int(dot_duration * 3 * 1000))
-            if voice_enabled:
-                time.sleep(0.2)
-                speak_text(engine, char)
+        if char in morse_code or char == ' ':
+            play_letter(engine, char)
         else:
             print(f"Skipping unsupported character: {char}")
 
@@ -188,7 +185,6 @@ def adjust_frequency():
 def show_menu():
     global current_wpm, dot_duration, current_frequency, show_morse, voice_enabled
     while True:
-        print(f"\nFrequency: {current_frequency} Hz | WPM: {current_wpm}")
         print_blue("Morse Code Trainer by Glenn Maclean WA7SPY")
         print_blue("Learning method by Michael Aretsky N6MQL (RIP)")
         print_blue("Practice 15 mins/day for 5-6 weeks to learn Morse!")
@@ -208,7 +204,7 @@ def show_menu():
         print_blue("12. Toggle Voice")
         print_blue("13. Exit")
 
-        print(f"Display: {'ON' if show_morse else 'OFF'} | Voice: {'ON' if voice_enabled else 'OFF'}")
+        print(f"Display: {'ON' if show_morse else 'OFF'} | Voice: {'ON' if voice_enabled else 'OFF'} | WPM: {current_wpm} | Frequency: {current_frequency}Hz")
         choice = input("Enter choice (1-13): ")
 
         if choice == '1':
@@ -257,7 +253,7 @@ def graceful_exit(signal_received, frame):
     pygame.quit()
     exit(0)
 
-# Handle Ctrl+C
+# === Handle Ctrl+C ===
 signal.signal(signal.SIGINT, graceful_exit)
 
 # === Run Menu ===
