@@ -1,3 +1,0 @@
-numpy==2.2.3
-pygame==2.6.1
-pyttsx3

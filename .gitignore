@@ -2,3 +2,9 @@ pyEnv/
 __pycache__/
 
 morse_settings.json
+
+*.odt
+*.pdf
+*.desktop
+*.png
+oldmorsecode.py
