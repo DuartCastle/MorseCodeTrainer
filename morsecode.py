@@ -481,7 +481,7 @@ def show_main_menu():
             play_text(text)
         elif choice == '8':
             settings_menu()
-        elif choice == '9':
+        elif choice == '0':
             print("Goodbye!")
             pygame.quit()
             break
