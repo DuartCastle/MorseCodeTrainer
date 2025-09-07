@@ -1,4 +1,3 @@
-
 # Morse Code Trainer
 
 Created by: WA7SPY
@@ -15,16 +14,18 @@ You can:
 - Send random words and sentences built from each week's letters
 - Send random call signs, numbers, and punctuation
 - Enter your own text to send in Morse code
+- **Send the contents of a text file as Morse code** (menu option 9)
 - Adjust tone frequency and speed (WPM)
+- Use **Farnsworth timing** to slow spacing between letters/words while keeping character speed high
+- Stretch spacing further with a **Farnsworth gap multiplier**
 - Use Flash Card Mode to display large letters as they are sent
 - Toggle dot-dash display for reference
+- Toggle voice mode to speak letters aloud
 
-Morse code is an **audible language**—be sure to turn off the visual dot-dash display as soon as you can.
+Morse code is an **audible language**—turn off the visual dot-dash display as soon as you can.
 
 **Practice at least 15 minutes per day.**  
-Do not move to the next week’s letters until you can copy the current week’s letters confidently.
-
-When you have memorized all letters, numbers, and punctuation, you can practice with mixed random selections.
+Do not move to the next week until you can copy the current week confidently.
 
 **GOOD LUCK—ENJOY LEARNING!**
 
@@ -32,11 +33,17 @@ When you have memorized all letters, numbers, and punctuation, you can practice 
 
 ## Revision History
 
+**v2.2 – September 2025**
+- Added menu option 9: **Send from a text file**
+- Added **Farnsworth timing controls**:
+  - Set Farnsworth effective WPM
+  - Adjust Farnsworth gap multiplier
+- Fixed intra-character spacing (correctly plays “M=--”, “I=..”, etc.)
+- Improved macOS audio initialization (CoreAudio)
+
 **v2.1 – July 7, 2025**
-- Replaced Ctrl+C with Enter key to pause/resume sending
-- Added `q` + Enter to stop sending and return to the main menu
-- Retained menu option 9 for clean exit
-- Minor improvements to on-screen instructions
+- Enter = pause/resume; `q` + Enter = stop and return to menu
+- Minor on-screen instruction improvements
 
 ---
 
