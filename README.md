@@ -16,7 +16,7 @@ You can:
 - Enter your own text to send in Morse code
 - **Send the contents of a text file as Morse code** (menu option 9)
 - Adjust tone frequency and speed (WPM)
-- Use **Farnsworth timing** to slow spacing between letters/words while keeping character speed high
+- Use **Farnsworth timing** to slow spacing between letters/words while keeping character speed high (e.g., 25 WPM characters at 5 WPM effective)
 - Stretch spacing further with a **Farnsworth gap multiplier**
 - Use Flash Card Mode to display large letters as they are sent
 - Toggle dot-dash display for reference
