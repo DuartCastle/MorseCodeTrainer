@@ -1,4 +1,15 @@
-pyEnv/
-__pycache__/
+# macOS system files
+.DS_Store
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment (if you ever add one)
+venv/
+pyEnv/
+
+# Custom user settings file
 morse_settings.json
