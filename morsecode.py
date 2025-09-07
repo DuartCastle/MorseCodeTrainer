@@ -5,6 +5,7 @@ import random
 import shutil
 import subprocess
 import signal
+from typing import Optional
 
 from ascii_letters import ascii_letter
 
@@ -33,28 +34,36 @@ except ImportError:
 # === Settings File Functions ===
 def load_settings():
     default_settings = {
-        "current_frequency": 700,
-        "current_wpm": 10,
-        "show_morse": True,
-        "flash_card_mode_enabled": False,
+        "current_frequency": 500,         # Hz
+        "current_wpm": 25,                # character (dot) speed
+        "farnsworth_wpm": 5.0,            # effective speed via spacing
+        "farnsworth_gap_mult": 2.0,       # extra stretch for inter-char/word
+        "show_morse": False,
+        "flash_card_mode_enabled": True,
         "voice_enabled": False
     }
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as f:
             settings = json.load(f)
-        for k, v in default_settings.items():
-            if k not in settings:
-                settings[k] = v
-        return settings
     else:
-        with open(SETTINGS_FILE, 'w') as f:
-            json.dump(default_settings, f, indent=2)
-        return default_settings
+        settings = {}
+
+    # Ensure all keys exist (backward compatible)
+    for k, v in default_settings.items():
+        settings.setdefault(k, v)
+
+    # Write back if we added anything
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=2)
+    return settings
+
 
 def save_settings():
     settings = {
         "current_frequency": current_frequency,
         "current_wpm": current_wpm,
+        "farnsworth_wpm": farnsworth_wpm,
+        "farnsworth_gap_mult": farnsworth_gap_mult,
         "show_morse": show_morse,
         "flash_card_mode_enabled": flash_card_mode_enabled,
         "voice_enabled": voice_enabled
@@ -62,22 +71,57 @@ def save_settings():
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=2)
 
-# === Initialize Pygame ===
-pygame.init()
-pygame.mixer.init(frequency=44100, size=-16, channels=2)
+
+# === Robust Pygame init (CoreAudio on macOS) ===
+def init_audio():
+    system = platform.system()
+    if system == "Darwin":
+        os.environ["SDL_AUDIODRIVER"] = "coreaudio"
+    elif system == "Windows":
+        os.environ["SDL_AUDIODRIVER"] = "directsound"
+    else:
+        os.environ.setdefault("SDL_AUDIODRIVER", "alsa")
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+
+    try:
+        pygame.mixer.pre_init(frequency=44100, size=-16, channels=1, buffer=1024)
+        pygame.init()
+        pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=1024)
+    except pygame.error as e:
+        print(f"Audio init error with driver '{os.environ.get('SDL_AUDIODRIVER')}': {e}")
+        print("Retrying with SDL default...")
+        try:
+            os.environ.pop("SDL_AUDIODRIVER", None)
+            pygame.mixer.quit(); pygame.quit()
+            pygame.mixer.pre_init(frequency=44100, size=-16, channels=1, buffer=1024)
+            pygame.init()
+            pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=1024)
+        except pygame.error as e2:
+            print(f"Default driver failed: {e2}")
+            print("Falling back to 'dummy' (no-sound) so timing still runs.")
+            os.environ["SDL_AUDIODRIVER"] = "dummy"
+            pygame.mixer.quit(); pygame.quit()
+            pygame.mixer.pre_init(frequency=44100, size=-16, channels=1, buffer=1024)
+            pygame.init()
+            pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=1024)
+
+
+init_audio()
+
 
 # === Load Settings ===
 settings = load_settings()
-current_frequency = settings["current_frequency"]
-current_wpm = settings["current_wpm"]
-show_morse = settings["show_morse"]
-flash_card_mode_enabled = settings["flash_card_mode_enabled"]
-voice_enabled = settings["voice_enabled"]
-dot_duration = 60.0 / (current_wpm * 50.0)
+current_frequency        = settings["current_frequency"]
+current_wpm              = settings["current_wpm"]           # character speed
+farnsworth_wpm           = settings["farnsworth_wpm"]        # effective speed
+farnsworth_gap_mult      = settings["farnsworth_gap_mult"]   # extra stretch
+show_morse               = settings["show_morse"]
+flash_card_mode_enabled  = settings["flash_card_mode_enabled"]
+voice_enabled            = settings["voice_enabled"]
 timeout_supported = True
-engine = None
 
-# === Morse Code Letters, Words, Sentences, etc. ===
+
+# === Morse Code Map ===
 morse_code = {
     'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....',
     'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.',
@@ -100,16 +144,6 @@ week_letters = {
     9: '.,?/'
 }
 
-additional_characters = {
-    1: "",
-    2: "",
-    3: "",
-    4: "",
-    5: "",
-    6: "",
-    7: "",
-}
-
 week1_words = ["MAN", "TEN", "TAME", "MEAT", "TEAM", "MINE", "AMEN", "ANTI", "ITEM"]
 week1_sentences = ["A MAN MET ME", "AN ANT ATE ME", "I AM IN A TENT"]
 
@@ -122,28 +156,43 @@ week123_sentences = ["GO HUNT FOR A SHADOW", "THE WOLF MOVES FAST", "HIS FARM HA
 week1234_words = ["BLOCK", "JUMP", "CAMP", "PACK", "BRICK", "JAW", "SCRUB", "DUMP", "BACKUP", "SCARF"]
 week1234_sentences = ["PACK A BACKUP FOR CAMP", "THE BRICK WALL WAS SCRUBBED", "JUMP INTO THE DARK CAMP"]
 
-week7_words = ["BROWN", "JUMPS", "LAZY", "DOG", "FOX", "OVER", "QUICK", "THE", "ZEBRA", "PACK", "VEX", "JOKES", "QUIZ"]
+week7_words = ["THE", "QUICK", "BROWN", "FOX", "JUMPS", "OVER", "LAZY", "DOG", "PACK", "MY", "BOX", "WITH", "FIVE", "DOZEN", "LIQUOR", "JUGS"]
 week7_sentences = ["THE QUICK BROWN FOX JUMPS OVER LAZY DOG.", "PACK MY BOX WITH FIVE DOZEN LIQUOR JUGS."]
 
 all_words = week1_words + week12_words + week123_words + week1234_words
-
 call_signs = ["WA7SPY/QRP", "KB1FJZ", "N8FIT", "KA2UTL", "W4ZX", "N3BKQ", "WA5PRY/M", "N6OQN", "W8GSH"]
+
+
+# === Timing helpers (Farnsworth) ===
+def dot_duration_seconds(char_wpm: float) -> float:
+    # Standard: 1 dot = 1.2 / WPM seconds
+    return 1.2 / float(char_wpm)
+
+def farnsworth_scale(char_wpm: float, eff_wpm: float) -> float:
+    eff_wpm = max(1e-6, eff_wpm)
+    return max(1.0, float(char_wpm) / float(eff_wpm))
+
+def space_durations(char_wpm: float, eff_wpm: float, mult: float):
+    d = dot_duration_seconds(char_wpm)
+    scale = farnsworth_scale(char_wpm, eff_wpm) * max(0.1, float(mult))
+    intra = d * 1.0              # 1 dot between elements (fixed)
+    inter_char = d * 3.0 * scale # 3 dots * scale
+    inter_word = d * 7.0 * scale # 7 dots * scale
+    return d, intra, inter_char, inter_word
+
+def timing_now():
+    return space_durations(current_wpm, farnsworth_wpm, farnsworth_gap_mult)
+
 
 # === Utility Functions ===
 def prompt_for_pause(duration_seconds=3.0) -> str:
-    """Wait for specified duration, but allow Enter to pause"""
+    """Wait for specified duration, but allow Enter to pause or 'q' to quit."""
     global timeout_supported
-    # If timeout is not supported, just wait for the duration.
     if timeout_supported != True:
         pygame.time.wait(int(duration_seconds * 1000))
         return 'continue'
-
-    # If timeout is supported, wait for input with specified timeout.
     try:
-        import select
-        import sys
-
-        # Wait for input with specified timeout
+        import select, sys
         if select.select([sys.stdin], [], [], duration_seconds)[0]:
             user_input = input().strip().lower()
             if user_input == 'q':
@@ -157,19 +206,15 @@ def prompt_for_pause(duration_seconds=3.0) -> str:
                     print_blue("RESUMED")
                     return 'continue'
         else:
-            # Timeout occurred, continue automatically
             return 'continue'
     except:
-        # Fallback for systems where select doesn't work
         try:
-            import msvcrt  # Windows
-            import time
-
-            start_time = time.time()
-            while time.time() - start_time < duration_seconds:
+            import msvcrt, time
+            start = time.time()
+            while time.time() - start < duration_seconds:
                 if msvcrt.kbhit():
                     key = msvcrt.getch()
-                    if key == b'\r':  # Enter key
+                    if key == b'\r':
                         print_blue("PAUSED - Press Enter to continue, or type 'q' to quit...")
                         user_input = input().strip().lower()
                         if user_input == 'q':
@@ -179,12 +224,9 @@ def prompt_for_pause(duration_seconds=3.0) -> str:
                             return 'continue'
                     elif key == b'q':
                         return 'quit'
-                time.sleep(0.1)
-
-            # Timeout occurred, continue automatically
+                time.sleep(0.05)
             return 'continue'
         except:
-            # If we try to use timeout and it fails, don't try again.
             timeout_supported = False
             print_blue("Press Enter to continue, or type 'q' to quit...")
             user_input = input().strip().lower()
@@ -195,67 +237,72 @@ def prompt_for_pause(duration_seconds=3.0) -> str:
 def print_blue(text):
     print(f"\033[97m{text}\033[0m")
 
-# === Morse Code Sounds ===
+
+# === Tone generation (mono int16) ===
 def generate_tone(frequency, duration, sample_rate=44100):
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-    waveform = (np.sin(2 * np.pi * frequency * t) * 32767).astype(np.int16)
-    return np.column_stack((waveform, waveform))
+    wave = np.sin(2 * np.pi * frequency * t).astype(np.float32)
+    # 5 ms ramp to avoid key clicks
+    ramp_len = max(1, int(0.005 * sample_rate))
+    ramp = np.linspace(0.0, 1.0, ramp_len, dtype=np.float32)
+    wave[:ramp_len] *= ramp
+    wave[-ramp_len:] *= ramp[::-1]
+    wave_int16 = np.int16(wave * 32767)
+    return wave_int16  # 1-D mono
 
+
+# === Core playback (fixed intra-character spacing + Farnsworth) ===
 def play_morse(letter) -> str:
+    """Play the elements of one character with proper 1-dot gaps BETWEEN elements only."""
     if letter == ' ':
-        result = prompt_for_pause(dot_duration * 7)
-        if result == 'quit':
-            return 'quit'
         return 'continue'
 
-    for symbol in morse_code.get(letter, ''):
-        duration = dot_duration if symbol == '.' else dot_duration * 3
-        tone = generate_tone(current_frequency, duration)
+    code = morse_code.get(letter, '')
+    dot_s, intra_gap, _, _ = timing_now()
+
+    for i, symbol in enumerate(code):
+        dur = dot_s * (3.0 if symbol == '-' else 1.0)
+        tone = generate_tone(current_frequency, dur)
         sound = pygame.sndarray.make_sound(tone)
         sound.play()
-        
-        # Wait for tone duration
-        result = prompt_for_pause(duration)
+
+        result = prompt_for_pause(dur)
         if result == 'quit':
             return 'quit'
-        
-        # Wait for element spacing
-        result = prompt_for_pause(dot_duration)
-        if result == 'quit':
-            return 'quit'
-    
-    # Wait for letter spacing
-    result = prompt_for_pause(dot_duration * 3)
-    if result == 'quit':
-        return 'quit'
-    
+
+        # 1 dot gap only if NOT the last element
+        if i < len(code) - 1:
+            result = prompt_for_pause(intra_gap)
+            if result == 'quit':
+                return 'quit'
+
     return 'continue'
+
 
 # === Voice ===
 def speak_text(text) -> None:
     system = platform.system()
-    
     if system == "Darwin":  # macOS
-          # Use lowercase to avoid "capital" being spoken
         os.system(f"say '{text.lower()}'")
     elif system == "Linux":
         if shutil.which("espeak"):
             subprocess.run(["espeak", text])
-    elif system == "Windows":
-        global engine
-        if engine:
-            try:
-                engine.say(text)
-                engine.runAndWait()
-                engine.stop()
-            except Exception as e:
-                print(f"[DEBUG] pyttsx3 failed: {e}")
+    elif system == "Windows" and pyttsx3 is not None:
+        try:
+            engine = pyttsx3.init()
+            engine.say(text)
+            engine.runAndWait()
+            engine.stop()
+        except Exception:
+            pass
+
 
 # === Play Letter ===
 def play_letter(letter) -> str:
+    dot_s, _, inter_char_gap, inter_word_gap = timing_now()
+
     if letter == ' ':
-        print("Space (between words)")
-        return prompt_for_pause(dot_duration * 7)
+        return prompt_for_pause(inter_word_gap)
 
     if flash_card_mode_enabled:
         print("\n\n")
@@ -265,23 +312,23 @@ def play_letter(letter) -> str:
     else:
         print_blue(f"Sending: {letter}")
 
-    # Play the morse code for the letter
+    # Play elements
     result = play_morse(letter)
     if result == 'quit':
         return 'quit'
 
-    # Speak the letter
+    # Optional voice reveal
     if voice_enabled:
-        # Wait so the user can write their guess.
-        result = prompt_for_pause(dot_duration * 6)
+        result = prompt_for_pause(dot_s * 6)
         if result == 'quit':
             return 'quit'
         speak_text(letter)
 
-    # Space between letters
-    return prompt_for_pause(int(dot_duration * 3))
+    # Inter-character spacing ONCE here
+    return prompt_for_pause(inter_char_gap)
 
-# === Morse Features ===
+
+# === High-level send ===
 def play_text(text) -> str:
     for char in text.upper():
         if char in morse_code or char == ' ':
@@ -290,9 +337,9 @@ def play_text(text) -> str:
                 return 'quit'
     return 'continue'
 
+
 def practice_week_letters_continuously(week_num) -> str:
     letters = week_letters[week_num]
-
     i = 0
     while True:
         letter = random.choice(letters)
@@ -311,15 +358,32 @@ def practice_week_letters_continuously(week_num) -> str:
             break
         i += 1
 
+
 def play_random_text(text_list, count=1) -> str:
-    # Text is words or sentences.
     if count > 1:
-        selection = random.sample(text_list, count)
+        selection = random.sample(text_list, min(count, len(text_list)))
         text = " ".join(selection)
     else:
         text = random.choice(text_list)
-    # Either it completes or they quit. We handle both the same.
     play_text(text)
+
+
+# === File utilities (NEW) ===
+def resolve_path(p: str) -> str:
+    """Expand ~ and env vars; return absolute path."""
+    p = os.path.expanduser(os.path.expandvars(p.strip()))
+    if not os.path.isabs(p):
+        p = os.path.abspath(p)
+    return p
+
+def load_text_file(p: str) -> Optional[str]:
+    try:
+        with open(p, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except Exception as e:
+        print_blue(f"File error: {e}")
+        return None
+
 
 # === Setting modifications ===
 def adjust_frequency():
@@ -335,59 +399,93 @@ def adjust_frequency():
     except ValueError:
         print("Invalid input.")
 
-# === Menus ===
+
+# === Menus (original layout + new file option) ===
 def settings_menu():
-    global current_wpm, dot_duration, show_morse, flash_card_mode_enabled, voice_enabled
+    global current_wpm, farnsworth_wpm, farnsworth_gap_mult
+    global show_morse, flash_card_mode_enabled, voice_enabled
+
     while True:
         print_blue("\nSettings Menu")
         print_blue("0. Return to Main Menu")
         print_blue("1. Adjust Frequency")
-        print_blue("2. Set WPM")
-        print_blue("3. Toggle Morse Display")
-        print_blue("4. Toggle Flash Card Mode")
-        print_blue("5. Toggle Voice Mode")
-        choice = input("Choice: ").lower()
+        print_blue(f"2. Set WPM (character/dot speed) [current: {current_wpm}]")
+        print_blue(f"3. Toggle Morse Display (currently {'ON' if show_morse else 'OFF'})")
+        print_blue(f"4. Toggle Flash Card Mode (currently {'ON' if flash_card_mode_enabled else 'OFF'})")
+        print_blue(f"5. Toggle Voice Mode (currently {'ON' if voice_enabled else 'OFF'})")
+        print_blue(f"6. Set Farnsworth WPM (effective) [current: {farnsworth_wpm}]")
+        print_blue(f"7. Set Farnsworth gap multiplier (0.5–5.0) [current: {farnsworth_gap_mult:.2f}]")
+        choice = input("Choice: ").strip().lower()
 
         if choice == '1':
             adjust_frequency()
+
         elif choice == '2':
             try:
-                current_wpm = int(input("Enter WPM (5-40): "))
-                if 5 <= current_wpm <= 40:
-                    dot_duration = 60.0 / (current_wpm * 50.0)
+                w = int(input("Enter Character WPM (5–60): ").strip())
+                if 5 <= w <= 60:
+                    current_wpm = w
                     save_settings()
-                    print(f"WPM set to {current_wpm}")
+                    print(f"Character WPM set to {current_wpm}")
                 else:
                     print("Invalid WPM.")
             except ValueError:
                 print("Invalid input.")
+
         elif choice == '3':
             show_morse = not show_morse
             save_settings()
             print(f"Morse display is now {'ON' if show_morse else 'OFF'}")
+
         elif choice == '4':
             flash_card_mode_enabled = not flash_card_mode_enabled
-            show_morse = False
+            if flash_card_mode_enabled:
+                show_morse = False
             save_settings()
             print(f"Flash Card Mode is now {'ON' if flash_card_mode_enabled else 'OFF'}")
+
         elif choice == '5':
             voice_enabled = not voice_enabled
             save_settings()
             print(f"Voice Mode is now {'ON' if voice_enabled else 'OFF'}")
+
+        elif choice == '6':
+            try:
+                fw = float(input("Enter Farnsworth WPM (effective, 2–40): ").strip())
+                if 2.0 <= fw <= 40.0:
+                    farnsworth_wpm = fw
+                    save_settings()
+                    print(f"Farnsworth WPM set to {farnsworth_wpm}")
+                else:
+                    print("Invalid Farnsworth WPM.")
+            except ValueError:
+                print("Invalid input.")
+
+        elif choice == '7':
+            try:
+                m = float(input("Farnsworth gap multiplier (0.5–5.0): ").strip())
+                if 0.5 <= m <= 5.0:
+                    farnsworth_gap_mult = m
+                    save_settings()
+                    print(f"Farnsworth gap multiplier set to {farnsworth_gap_mult:.2f}")
+                else:
+                    print("Invalid multiplier.")
+            except ValueError:
+                print("Invalid input.")
+
         elif choice == '0':
             break
+
         else:
             print("Invalid choice.")
+
 
 def practice_week_menu():
     print_blue("\nPractice Week Letters")
     print_blue("0. Return to Main Menu")
     for i in range(1, 8):
         letters = week_letters[i]
-        if i in [1, 2, 3, 4]:
-            display = letters
-        else:
-            display = ''.join(sorted(set(letters)))
+        display = letters if i in [1, 2, 3, 4] else ''.join(sorted(set(letters)))
         print_blue(f"{i}. Week {i} ({display})")
     choice = input("Choice: ").lower()
     if choice == '0':
@@ -459,9 +557,13 @@ def show_main_menu():
         print_blue("6. Random Punctuation (" + week_letters[9] + ")")
         print_blue("7. Enter Custom Text")
         print_blue("8. Settings")
-        if timeout_supported == True:
-            print(f"\nPress [Enter] to Pause. Press [q] then [Enter] to Stop.")
-        print(f"\nDisplay: {'ON' if show_morse else 'OFF'} | Flash: {'ON' if flash_card_mode_enabled else 'OFF'} | Voice: {'ON' if voice_enabled else 'OFF'} | WPM: {current_wpm} | Frequency: {current_frequency}Hz")
+        print_blue("9. Send from a text file")  # NEW option
+
+        dot_s, _, inter_char_gap, inter_word_gap = timing_now()
+        print(f"\nPress [Enter] to Pause. Press [q] then [Enter] to Stop.")
+        print(f"\nDisplay: {'ON' if show_morse else 'OFF'} | Flash: {'ON' if flash_card_mode_enabled else 'OFF'} | Voice: {'ON' if voice_enabled else 'OFF'}"
+              f" | WPM: {current_wpm} | Farnsworth: {farnsworth_wpm} | GapMult: {farnsworth_gap_mult:.2f} | Frequency: {current_frequency}Hz")
+
         choice = input("Choice: ").lower()
 
         if choice == '1':
@@ -481,8 +583,23 @@ def show_main_menu():
             play_text(text)
         elif choice == '8':
             settings_menu()
-        elif choice == '9':
+        elif choice == '9':  # NEW
+            p = input("Enter path to text file (e.g., ~/Desktop/qso.txt): ").strip()
+            rp = resolve_path(p)
+            txt = load_text_file(rp)
+            if txt is None:
+                print_blue("Could not read file. Double-check the full path.")
+            else:
+                # Normalize whitespace: collapse runs of whitespace to single spaces
+                cleaned = ' '.join(txt.split())
+                print_blue(f"\nSending file: {rp}\n")
+                play_text(cleaned)
+        elif choice == '0':
             print("Goodbye!")
+            try:
+                pygame.mixer.quit()
+            except Exception:
+                pass
             pygame.quit()
             break
         else:
