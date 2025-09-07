@@ -148,13 +148,14 @@ Morse Code Trainer - Main Menu
 6. Random Punctuation (.,?/)
 7. Enter Custom Text
 8. Settings
-9. Exit
+9. Send from a text file
+
 Press [Enter] to Pause. Press [q] then [Enter] to Stop.
-Display: ON | Flash: OFF | WPM: 10 | Frequency: 700Hz
+Display: ON | Flash: OFF | Voice: OFF | WPM: 25 | Farnsworth: 5 | GapMult: 2.0 | Frequency: 500Hz
 Choice:
 ```
 
-While sending, the program will display:
+While sending, the program may show:
 
 ```
 Sending: E (.)
@@ -164,36 +165,98 @@ Sending: E (.)
 
 ## Using the Program
 
-**Main Menu Options:**
-- **1. Practice Week Letters:** Sends letters from a specific week's group randomly.
-- **2. Random Word:** Sends 3 randomly selected words.
-- **3. Random Sentence:** Sends a randomly selected sentence.
-- **4. Random Call Sign:** Sends a randomly selected ham call sign.
-- **5. Random Numbers:** Sends numbers randomly.
-- **6. Random Punctuation:** Sends punctuation marks randomly.
-- **7. Enter Custom Text:** You type anything, and it will send it back in Morse code.
-- **8. Settings:** Adjust frequency, WPM, display options, and flash card mode.
-- **9. Exit:** Close the program.
+**Main Menu Options**
+1. **Practice Week Letters** – Sends letters from a specific week's group randomly.  
+2. **Random Word** – Sends 3 randomly selected words.  
+3. **Random Sentence** – Sends a randomly selected sentence.  
+4. **Random Call Sign** – Sends a randomly selected ham call sign.  
+5. **Random Numbers** – Sends numbers randomly.  
+6. **Random Punctuation** – Sends punctuation marks randomly.  
+7. **Enter Custom Text** – You type anything; it sends it back in Morse code.
+8. **Settings** – Adjust frequency, Character WPM (dot speed), **Farnsworth WPM (effective)**, **Farnsworth gap multiplier**, display options, flash card mode, and voice mode.  
+9. **Send from a text file** – Enter a path like `~/Desktop/qso.txt`; the file’s text is normalized and sent in Morse.
+
+**Pausing and Stopping**
+- **Pause/Resume**: Press **Enter** during playback  
+- **Stop** and return to menu: Press **q** then **Enter**
 
 ---
 
-## Pausing and Stopping
+## Farnsworth Timing (How to Use)
 
-- **Pause/Resume sending:**  
-  Press **Enter** during playback.
-- **Stop sending and return to the main menu:**  
-  Press **q** and then **Enter** during playback.
-- **Exit completely:**  
-  Use **menu option 9**.
+- **Character WPM** sets the actual **dit length** (tone speed while characters play).  
+- **Farnsworth WPM** slows down **spacing** (between letters/words) to create a lower **effective** speed.  
+- **Gap Multiplier** adds extra stretch on inter-character/word gaps (on top of Farnsworth), useful at very low effective speeds.
+
+**Common setup for learners**: Characters at **25 WPM**, **Farnsworth 5 WPM**, **Gap Multiplier ~1.8–2.2**.
+
+---
+
+## Revision History
+
+**v2.2 – September 2025**
+- Added menu option 9: **Send from a text file**
+- Added **Farnsworth timing controls**:
+  - Set **Farnsworth effective WPM**
+  - Adjust **Farnsworth gap multiplier**
+- Fixed intra-character spacing (correctly plays “M=--”, “I=..”, etc.)
+- Improved macOS audio initialization (CoreAudio)
+
+**v2.1 – July 7, 2025**
+- Enter = pause/resume; `q` + Enter = stop and return to menu
+- Minor on-screen instruction improvements
 
 ---
 
-## Acknowledgment
-
-This program’s method and sequence for learning Morse Code are inspired by the work of **Mike Aretsky, N6MQL**.
-
-Mike was a beloved ham radio leader, Morse code advocate, accomplished engineer, and community pillar. His passions spanned amateur radio, music, electronics, and service—leaving a vibrant legacy respected by many in the Sacramento Valley.
-
-This project is dedicated to his memory and to his commitment to sharing Morse Code with new generations.
+## Requirements
+- Python 3
+- pygame
+- numpy
 
 ---
+
+## Installation
+
+### Windows
+1. Install Python 3 from https://www.python.org/
+2. Install dependencies:
+   ```bash
+   pip install pygame numpy pyttsx3
+   ```
+3. Run:
+   ```bash
+   python morsecode.py
+   ```
+
+### macOS / Linux
+1. Install Python 3 (Homebrew, apt, etc.)
+2. Install dependencies:
+   ```bash
+   pip install pygame numpy
+   ```
+3. Run:
+   ```bash
+   python3 morsecode.py
+   ```
+
+---
+
+## Important Files
+- `morsecode.py` – main program  
+- `ascii_letters.py` – large-letter display for Flash Card Mode  
+If `ascii_letters.py` is missing or in another folder, Python will raise:
+```
+ModuleNotFoundError: No module named 'ascii_letters'
+```
+
+---
+
+## Acknowledgment / Tribute
+
+This project’s learning sequence and approach are **inspired by the work of Mike Aretsky, N6MQL (SK)**. Mike was a beloved ham radio leader, Morse code advocate, accomplished engineer, and community pillar whose legacy continues to help new operators learn CW.
+
+---
+
+## License
+
+(Choose a license if you want one—e.g., MIT—or remove this section.)
