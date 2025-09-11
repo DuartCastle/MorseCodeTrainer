@@ -39,6 +39,7 @@ def load_settings():
         "farnsworth_wpm": 5.0,            # effective speed via spacing
         "farnsworth_gap_mult": 2.0,       # extra stretch for inter-char/word
         "show_morse": False,
+        "show_text": True,
         "flash_card_mode_enabled": True,
         "voice_enabled": False
     }
@@ -65,6 +66,7 @@ def save_settings():
         "farnsworth_wpm": farnsworth_wpm,
         "farnsworth_gap_mult": farnsworth_gap_mult,
         "show_morse": show_morse,
+        "show_text": show_text,
         "flash_card_mode_enabled": flash_card_mode_enabled,
         "voice_enabled": voice_enabled
     }
@@ -116,6 +118,7 @@ current_wpm              = settings["current_wpm"]           # character speed
 farnsworth_wpm           = settings["farnsworth_wpm"]        # effective speed
 farnsworth_gap_mult      = settings["farnsworth_gap_mult"]   # extra stretch
 show_morse               = settings["show_morse"]
+show_text                = settings["show_text"]
 flash_card_mode_enabled  = settings["flash_card_mode_enabled"]
 voice_enabled            = settings["voice_enabled"]
 timeout_supported = True
@@ -183,7 +186,6 @@ def space_durations(char_wpm: float, eff_wpm: float, mult: float):
 def timing_now():
     return space_durations(current_wpm, farnsworth_wpm, farnsworth_gap_mult)
 
-
 # === Utility Functions ===
 def prompt_for_pause(duration_seconds=3.0) -> str:
     """Wait for specified duration, but allow Enter to pause or 'q' to quit."""
@@ -237,7 +239,6 @@ def prompt_for_pause(duration_seconds=3.0) -> str:
 def print_blue(text):
     print(f"\033[97m{text}\033[0m")
 
-
 # === Tone generation (mono int16) ===
 def generate_tone(frequency, duration, sample_rate=44100):
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
@@ -250,9 +251,8 @@ def generate_tone(frequency, duration, sample_rate=44100):
     wave_int16 = np.int16(wave * 32767)
     return wave_int16  # 1-D mono
 
-
 # === Core playback (fixed intra-character spacing + Farnsworth) ===
-def play_morse(letter) -> str:
+def play_morse(letter, include_farnsworth=True) -> str:
     """Play the elements of one character with proper 1-dot gaps BETWEEN elements only."""
     if letter == ' ':
         return 'continue'
@@ -265,7 +265,6 @@ def play_morse(letter) -> str:
         tone = generate_tone(current_frequency, dur)
         sound = pygame.sndarray.make_sound(tone)
         sound.play()
-
         result = prompt_for_pause(dur)
         if result == 'quit':
             return 'quit'
@@ -277,7 +276,6 @@ def play_morse(letter) -> str:
                 return 'quit'
 
     return 'continue'
-
 
 # === Voice ===
 def speak_text(text) -> None:
@@ -296,24 +294,27 @@ def speak_text(text) -> None:
         except Exception:
             pass
 
-
 # === Play Letter ===
-def play_letter(letter) -> str:
+def play_letter(letter, include_farnsworth=True) -> str:
     dot_s, _, inter_char_gap, inter_word_gap = timing_now()
 
     if letter == ' ':
         return prompt_for_pause(inter_word_gap)
-
+    show_msg = ""
     if flash_card_mode_enabled:
-        print("\n\n")
-        print_blue(ascii_letter(letter))
-    elif show_morse:
-        print_blue(f"Sending: {letter} ({morse_code[letter]})")
-    else:
-        print_blue(f"Sending: {letter}")
+        show_msg = "\n\n"
+        show_msg += ascii_letter(letter)
+    elif show_morse or show_text:
+        show_msg += "Sending:"
+        if show_text:
+            show_msg += f" {letter}"
+        if show_morse:
+            show_msg += f" ({morse_code[letter]})"
+        
+    print_blue(show_msg)
 
     # Play elements
-    result = play_morse(letter)
+    result = play_morse(letter, include_farnsworth)
     if result == 'quit':
         return 'quit'
 
@@ -325,8 +326,9 @@ def play_letter(letter) -> str:
         speak_text(letter)
 
     # Inter-character spacing ONCE here
+    if include_farnsworth == False:
+        return
     return prompt_for_pause(inter_char_gap)
-
 
 # === High-level send ===
 def play_text(text) -> str:
@@ -336,7 +338,6 @@ def play_text(text) -> str:
             if result == 'quit':
                 return 'quit'
     return 'continue'
-
 
 def practice_week_letters_continuously(week_num) -> str:
     letters = week_letters[week_num]
@@ -358,7 +359,6 @@ def practice_week_letters_continuously(week_num) -> str:
             break
         i += 1
 
-
 def play_random_text(text_list, count=1) -> str:
     if count > 1:
         selection = random.sample(text_list, min(count, len(text_list)))
@@ -367,6 +367,30 @@ def play_random_text(text_list, count=1) -> str:
         text = random.choice(text_list)
     play_text(text)
 
+def quiz_mode(week_num) -> str:
+    global flash_card_mode_enabled, voice_enabled, show_text
+    print("Disabling Flash Card Mode")
+    flash_card_mode_enabled = False
+    print("Disabling Voice")
+    voice_enabled = False
+    show_text = False
+    letters = week_letters[week_num]
+    while True:
+        letter = random.choice(letters)
+        if letter == ' ':
+            continue
+
+        result = play_letter(letter, False)
+        if result == 'quit':
+            break
+        
+        # Get user guess
+        guess = input("Guess: ").upper()
+        if guess == letter.upper():
+            print("CORRECT!")
+        else:
+            print("Not quite! That was a", letter)
+    show_text = True
 
 # === File utilities (NEW) ===
 def resolve_path(p: str) -> str:
@@ -384,7 +408,6 @@ def load_text_file(p: str) -> Optional[str]:
         print_blue(f"File error: {e}")
         return None
 
-
 # === Setting modifications ===
 def adjust_frequency():
     global current_frequency
@@ -399,11 +422,10 @@ def adjust_frequency():
     except ValueError:
         print("Invalid input.")
 
-
 # === Menus (original layout + new file option) ===
 def settings_menu():
     global current_wpm, farnsworth_wpm, farnsworth_gap_mult
-    global show_morse, flash_card_mode_enabled, voice_enabled
+    global show_morse, show_text, flash_card_mode_enabled, voice_enabled
 
     while True:
         print_blue("\nSettings Menu")
@@ -479,7 +501,6 @@ def settings_menu():
         else:
             print("Invalid choice.")
 
-
 def practice_week_menu():
     print_blue("\nPractice Week Letters")
     print_blue("0. Return to Main Menu")
@@ -543,6 +564,21 @@ def random_sentence_menu():
     else:
         print("Invalid choice.")
 
+def quiz_mode_menu():
+    print_blue("\nPop Quiz Mode")
+    print_blue("0. Return to Main Menu")
+    for i in range(1, 8):
+        letters = week_letters[i]
+        display = letters if i in [1, 2, 3, 4] else ''.join(sorted(set(letters)))
+        print_blue(f"{i}. Week {i} ({display})")
+    choice = input("Choice: ").lower()
+    if choice == '0':
+        return
+    elif choice in [str(i) for i in range(1, 8)]:
+        quiz_mode(int(choice))
+    else:
+        print("Invalid choice.")
+
 def show_main_menu():
     while True:
         print_blue("\n --------------------------------")
@@ -557,7 +593,8 @@ def show_main_menu():
         print_blue("6. Random Punctuation (" + week_letters[9] + ")")
         print_blue("7. Enter Custom Text")
         print_blue("8. Settings")
-        print_blue("9. Send from a text file")  # NEW option
+        print_blue("9. Send from a text file")
+        print_blue("10. Quiz Mode")
 
         dot_s, _, inter_char_gap, inter_word_gap = timing_now()
         print(f"\nPress [Enter] to Pause. Press [q] then [Enter] to Stop.")
@@ -594,6 +631,8 @@ def show_main_menu():
                 cleaned = ' '.join(txt.split())
                 print_blue(f"\nSending file: {rp}\n")
                 play_text(cleaned)
+        elif choice == '10':
+            quiz_mode_menu()
         elif choice == '0':
             print("Goodbye!")
             try:
