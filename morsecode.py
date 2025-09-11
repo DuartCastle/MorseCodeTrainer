@@ -385,9 +385,11 @@ def quiz_mode(week_num) -> str:
             break
         
         # Get user guess
-        guess = input("Guess: ").upper()
+        guess = input("Guess (type 'quit' to quit): ").upper()
         if guess == letter.upper():
             print("CORRECT!")
+        elif guess == "QUIT":
+            break
         else:
             print("Not quite! That was a", letter)
     show_text = True
