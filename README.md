@@ -24,7 +24,7 @@ You can:
 
 Morse code is an **audible language**—turn off the visual dot-dash display as soon as you can.
 
-**Practice at least 15 minutes per day.**  
+**Practice at least 15 minutes per day.**
 Do not move to the next week until you can copy the current week confidently.
 
 **GOOD LUCK—ENJOY LEARNING!**
@@ -166,26 +166,26 @@ Sending: E (.)
 ## Using the Program
 
 **Main Menu Options**
-1. **Practice Week Letters** – Sends letters from a specific week's group randomly.  
-2. **Random Word** – Sends 3 randomly selected words.  
-3. **Random Sentence** – Sends a randomly selected sentence.  
-4. **Random Call Sign** – Sends a randomly selected ham call sign.  
-5. **Random Numbers** – Sends numbers randomly.  
-6. **Random Punctuation** – Sends punctuation marks randomly.  
+1. **Practice Week Letters** – Sends letters from a specific week's group randomly.
+2. **Random Word** – Sends 3 randomly selected words.
+3. **Random Sentence** – Sends a randomly selected sentence.
+4. **Random Call Sign** – Sends a randomly selected ham call sign.
+5. **Random Numbers** – Sends numbers randomly.
+6. **Random Punctuation** – Sends punctuation marks randomly.
 7. **Enter Custom Text** – You type anything; it sends it back in Morse code.
-8. **Settings** – Adjust frequency, Character WPM (dot speed), **Farnsworth WPM (effective)**, **Farnsworth gap multiplier**, display options, flash card mode, and voice mode.  
+8. **Settings** – Adjust frequency, Character WPM (dot speed), **Farnsworth WPM (effective)**, **Farnsworth gap multiplier**, display options, flash card mode, and voice mode.
 9. **Send from a text file** – Enter a path like `~/Desktop/qso.txt`; the file’s text is normalized and sent in Morse.
 
 **Pausing and Stopping**
-- **Pause/Resume**: Press **Enter** during playback  
+- **Pause/Resume**: Press **Enter** during playback
 - **Stop** and return to menu: Press **q** then **Enter**
 
 ---
 
 ## Farnsworth Timing (How to Use)
 
-- **Character WPM** sets the actual **dit length** (tone speed while characters play).  
-- **Farnsworth WPM** slows down **spacing** (between letters/words) to create a lower **effective** speed.  
+- **Character WPM** sets the actual **dit length** (tone speed while characters play).
+- **Farnsworth WPM** slows down **spacing** (between letters/words) to create a lower **effective** speed.
 - **Gap Multiplier** adds extra stretch on inter-character/word gaps (on top of Farnsworth), useful at very low effective speeds.
 
 **Common setup for learners**: Characters at **25 WPM**, **Farnsworth 5 WPM**, **Gap Multiplier ~1.8–2.2**.
@@ -242,8 +242,8 @@ Sending: E (.)
 ---
 
 ## Important Files
-- `morsecode.py` – main program  
-- `ascii_letters.py` – large-letter display for Flash Card Mode  
+- `morsecode.py` – main program
+- `ascii_letters.py` – large-letter display for Flash Card Mode
 If `ascii_letters.py` is missing or in another folder, Python will raise:
 ```
 ModuleNotFoundError: No module named 'ascii_letters'
